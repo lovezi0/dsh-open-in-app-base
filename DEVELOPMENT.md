@@ -67,7 +67,7 @@ export function apply(ctx) {
 - **依赖必须写成可选**：`openInAppTargets` 只能在 `apply` 内经 `ctx.inject(...)` 消费，绝不能出现在顶层 `export const inject` 里，否则用户没装底座时整个 web 客户端起不来，原因与机制见下一节。
 - **声明底座依赖**：下游插件必须在自己的安装说明里显式写明需要本插件，原因与模板见下一节。
 
-### 5. 为什么依赖必须可选，以及安装说明为何仍要声明底座
+### 5. 为什么依赖必须可选，以及底座的两类装配方式
 
 两层原因，各管一头：
 
@@ -81,6 +81,30 @@ export function apply(ctx) {
 > dsh plugin --profile web add dsh-open-in-app-base
 > dsh plugin --profile web add <本插件地址>
 > ```
+
+若不想让用户手动装两步，也可以在下游插件自己的 bundle patch 里**一并装配底座**——装本插件时底座随之就位：
+
+```yaml
+# dsh-<本插件名> 的 cordis.patch.yml：随本插件一并装配底座与本插件。
+# insert.name 必须是【包名】；profile 用 nodeLinker: hoisted，本包的依赖会平铺进
+# profile 的 node_modules 根，底座行因此可解析。
+# 底座行的 id 与 dsh-open-in-app-base 自身 patch 的行 id 逐字一致（open-in-app-base）：
+# 用户同时显式安装底座时，同 id 行按层覆盖，不会双重加载。
+- insert:
+    - id: open-in-app-base
+      name: 'dsh-open-in-app-base'
+    - id: <本插件行 id>
+      name: '<本插件包名>'
+```
+
+要点：
+
+- 该 patch 文件须在下游包的 `package.json` 里用 `dsh.bundle.patch` 声明，随包分发。
+- `insert` 行的 `name` 是 **npm 包名**（Node 据此解析入口），不是路径；`id` 只是 patch 行的唯一标识。
+- 底座行的 `id` 必须逐字用 `open-in-app-base`（与底座自身 patch 一致）。patch 按层生效、**同 id 行后层覆盖前层**：用户既走了一并装配又显式 `add` 底座时，两层的同 id 行互相覆盖，只加载一份，不会双重装配。
+- 前提是 profile 的依赖平铺（`nodeLinker: hoisted`），本包声明的底座依赖会被安装到 profile 的 `node_modules` 根，patch 行才能按包名解析到——所以下游包须把底座列进自身依赖，否则一并装配的底座行会因解析不到包名而加载失败。
+
+采用一并装配的下游，安装说明可简化为一条 `dsh plugin --profile web add <本插件地址>`；但仍建议注明底座来源，便于用户理解菜单从何而来。
 
 ### 6. 常见坑
 
