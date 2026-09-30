@@ -31,8 +31,10 @@ jobs:
             git branch --track "$ref" "origin/$ref" 2>/dev/null || true
           done
 
-          git push cnb --all
-          git push cnb --tags
+          # CNB 是纯镜像，以 GitHub 为准：CNB 侧初始提交与本站历史无共同祖先，
+          # 非快进推送会被拒；强制覆盖是镜像语义，CNB 上若有直接提交会被冲掉。
+          git push cnb --all --force
+          git push cnb --tags --force
 
           # 如果有 LFS 大文件再补这两行
           git lfs fetch --all origin
