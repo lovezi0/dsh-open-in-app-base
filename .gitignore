@@ -1,0 +1,8 @@
+# 本地生成物：含本机私有路径，勿开源
+AGENTS.md
+
+# 依赖与构建缓存
+node_modules/
+*.log
+
+docs/
