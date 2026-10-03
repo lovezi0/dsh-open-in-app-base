@@ -1,6 +1,6 @@
 {
   "name": "dsh-open-in-app-base",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "DeepSeek Harness 插件：Session header 的 \"Open In...\" 按钮组底座，提供注册契约供同类插件补充目标软件。",
   "type": "module",
   "main": "lib/index.js",

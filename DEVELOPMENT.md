@@ -90,6 +90,37 @@ export function apply(ctx) {
 - 浏览器半边只能 `require` 平台单例（`react`、`react-dom`、`@deepseek-ai/cordis`、`@deepseek-ai/dsh-client-store`、`@deepseek-ai/dsh-client-ui-slots`、`@deepseek-ai/dsh-client-ui-primitives`、`@deepseek-ai/dsh-client-ui-dockkit`），且不支持插件内相对 `require`；样式只能以 JS 字符串内联，颜色请用 `--dsw-*` 主题变量。
 - 目标图标只传路径数据（24×24、描边、`currentColor`）。想让菜单项图标与底座风格一致，可从 [lucide](https://lucide.dev) 取同一风格的图标路径。
 
+### 7. 持久化自定义设置（`openInAppState`）
+
+下游插件常有需要跨重启保留的少量设置，典型是「用户自定义的安装路径」。这类值**不要**自己读写文件：底座的宿主半边托管了一份状态存储，跨 profile 共享同一份数据，并承接全部落盘细节（原子写、坏档降级、多个下游共存时的合并）。
+
+适配方式与 `openInAppTargets` 完全一致——**可选依赖，顶层不声明 `inject`**：
+
+```js
+export function apply(ctx) {
+  const state = ctx.get("openInAppState")?.namespace("dsh-open-in-codebuddy");
+  const custom = typeof state?.get("home") === "string" ? state.get("home").trim() : "";
+  // 底座缺席 → state 为 undefined → 退回自动探测 / 自身的 Config
+}
+```
+
+`owner` 必须传**本插件的包名**——它是隔离边界：不同插件即使使用同名 key 也互不干扰。key 自取；value 是任意 JSON（string / array / object 等一律支持，形状语义由贡献方自己定），序列化后不超过 64 KiB。
+
+| 方法 | 说明 |
+|---|---|
+| `get(key)` | 取本插件的值，未设置时返回 `undefined` |
+| `set(key, value)` | 同步落盘；入参非法或落盘失败会抛错 |
+| `delete(key)` | 幂等删除；**清空请用 delete**，不要存 `undefined` |
+| `keys()` | 本插件的键名快照 |
+| `all()` | 本插件的键值快照（深拷贝，改它不影响存储） |
+| `subscribe(fn)` | 本进程内的变更与外部改动通知；返回反注册函数 |
+
+行为要点：
+
+- **跨 profile 共享**：同一 `$DSH_HOME` 下的各个 profile 看到同一份数据；改动在下一次读或写时被感知（拉取式，底座不装文件监听）。
+- **失败语义**：读到的值不合预期（例如用户手改过文件）请自行降级；`set` 会抛错，需自行捕获并给用户提示，不要静默忽略。
+- **不要访问状态文件**：文件位置与格式由底座管理，下游不应推断、解析或直接读写它。
+
 ## 本仓库的构建与自测
 
 - 构建：`npm run build`（纯 Node 脚本，零依赖；产物 `lib/` 随仓库提交，安装侧零构建）。
